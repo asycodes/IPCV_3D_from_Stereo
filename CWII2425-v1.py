@@ -265,7 +265,59 @@ if __name__ == '__main__':
     Write your code here
     '''
     ###################################
+    # Task 3: Circle Detection using HoughCircles
+    def detect_circles(image_path, output_path, dp=1.2, min_dist=30, param1=50, param2=30, min_radius=10, max_radius=50):
+        """
+        Detect circles using Hough Circle Transform.
+        INPUT:
+            image_path: Path of the input image.
+            output_path: Path to save the output image.
+            dp: Inverse ratio of the accumulator resolution to the image resolution.
+            min_dist: Minimum distance between the centers of detected circles.
+            param1: Gradient value for edge detection.
+            param2: Accumulator threshold for circle centers.
+            min_radius: Minimum radius of detected circles.
+            max_radius: Maximum radius of detected circles.
+        OUTPUT:
+            detected_circles: List of detected circles [(x_center, y_center, radius), ...].
+        """
+        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (9, 9), 2) #REDUCE NOISE
 
+        circles = cv2.HoughCircles(
+            gray,
+            cv2.HOUGH_GRADIENT,
+            dp=dp,
+            minDist=min_dist,
+            param1=param1,
+            param2=param2,
+            minRadius=min_radius,
+            maxRadius=max_radius
+        )
+
+        detected_circles = []
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            for circle in circles[0, :]:
+                x, y, r = circle
+                detected_circles.append((x, y, r))
+                cv2.circle(img, (x, y), r, (0, 255, 0), 2) #CIRCLE
+                cv2.circle(img, (x, y), 2, (0, 0, 255), 3) #CENTER
+
+        cv2.imwrite(output_path, img)
+        return detected_circles
+
+
+    view0_circles = detect_circles(
+        "view0.png", "view0_circles.png", dp=1.2, min_dist=30, param1=50, param2=30, min_radius=10, max_radius=50
+    )
+    view1_circles = detect_circles(
+        "view1.png", "view1_circles.png", dp=1.2, min_dist=30, param1=50, param2=30, min_radius=10, max_radius=50
+    )
+
+    print("View 0 Circles:", view0_circles)
+    print("View 1 Circles:", view1_circles)
 
     ###################################
     '''
@@ -277,6 +329,72 @@ if __name__ == '__main__':
     Write your code here
     '''
     ###################################
+
+
+
+def draw_epipolar_lines(image1, image2, points1, points2, fundamental_matrix):
+    """
+    Draw epipolar lines on two images given corresponding points and the fundamental matrix.
+    INPUT:
+        image1: First image (numpy array).
+        image2: Second image (numpy array).
+        points1: Corresponding points in the first image.
+        points2: Corresponding points in the second image.
+        fundamental_matrix: Fundamental matrix computed from the point correspondences.
+    OUTPUT:
+        img1_with_lines, img2_with_lines: image with epipolar
+    """
+    points1 = np.int32(points1)
+    points2 = np.int32(points2)
+    lines1 = cv2.computeCorrespondEpilines(points2.reshape(-1, 1, 2), 2, fundamental_matrix)
+    lines1 = lines1.reshape(-1, 3)
+    img1_with_lines = image1.copy()
+
+    for r, pt in zip(lines1, points1):
+        color = tuple(np.random.randint(0, 255, 3).tolist())
+        x0, y0 = map(int, [0, -r[2] / r[1]])
+        x1, y1 = map(int, [img1_with_lines.shape[1], -(r[2] + r[0] * img1_with_lines.shape[1]) / r[1]])
+        cv2.line(img1_with_lines, (x0, y0), (x1, y1), color, 1)
+        cv2.circle(img1_with_lines, tuple(pt), 5, color, -1)
+    lines2 = cv2.computeCorrespondEpilines(points1.reshape(-1, 1, 2), 1, fundamental_matrix)
+    lines2 = lines2.reshape(-1, 3)
+    img2_with_lines = image2.copy()
+
+    for r, pt in zip(lines2, points2):
+        color = tuple(np.random.randint(0, 255, 3).tolist())
+        x0, y0 = map(int, [0, -r[2] / r[1]])
+        x1, y1 = map(int, [img2_with_lines.shape[1], -(r[2] + r[0] * img2_with_lines.shape[1]) / r[1]])
+        cv2.line(img2_with_lines, (x0, y0), (x1, y1), color, 1)
+        cv2.circle(img2_with_lines, tuple(pt), 5, color, -1)
+
+    return img1_with_lines, img2_with_lines
+
+
+def task4_epipolar_lines(view0_path, view1_path, view0_points, view1_points):
+    """
+    Task 4: FIND Fundamental Matrix and draw the epipolar lines
+    INPUT:
+        view0_path: Path to the first image.
+        view1_path: Path to the second image.
+        view0_points: List of points (x, y) in the first image.
+        view1_points: List of points (x, y) in the second image.
+    """
+    img1 = cv2.imread(view0_path)
+    img2 = cv2.imread(view1_path)
+    points1 = np.array(view0_points, dtype=np.float32)
+    points2 = np.array(view1_points, dtype=np.float32)
+    fundamental_matrix, mask = cv2.findFundamentalMat(points1, points2, cv2.FM_RANSAC)
+
+    img1_with_lines, img2_with_lines = draw_epipolar_lines(img1, img2, points1, points2, fundamental_matrix)
+    cv2.imwrite("view0_epilines.png", img1_with_lines)
+    cv2.imwrite("view1_epilines.png", img2_with_lines)
+
+    print("Fundamental Matrix:\n", fundamental_matrix)
+
+
+view0_points = [(320, 240), (300, 200), (340, 220)] 
+view1_points = [(310, 250), (290, 210), (330, 230)]
+task4_epipolar_lines("view0.png", "view1.png", view0_points, view1_points)
 
 
     ###################################
